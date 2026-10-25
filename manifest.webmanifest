@@ -1,0 +1,16 @@
+{
+  "name": "EDITH",
+  "short_name": "EDITH",
+  "description": "TV'deki ana ekrana Türkçe sesli komut gönderir.",
+  "lang": "tr",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#0a0204",
+  "theme_color": "#0a0204",
+  "icons": [
+    { "src": "edith-icon.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
+    { "src": "edith-icon.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ]
+}

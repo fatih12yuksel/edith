@@ -1,0 +1,154 @@
+<!doctype html>
+<html lang="tr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#020812">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="EDITH">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="edith-icon.png">
+<link rel="apple-touch-icon" href="edith-icon.png">
+<title>EDITH</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Chakra+Petch:wght@500;600&family=Share+Tech+Mono&display=swap">
+<style>
+/* Telefondaki EDITH: "Edith" duyunca (ya da açılır açılmaz) gelen komutu TV'ye gönderir. Mesajlar ntfy.sh üzerinden gider. */
+:root { --bg: #020812; --hud: #ff5a5a; --amber: #f4f6fa; --fg: #e6fbff; --muted: #c99a9a; color-scheme: dark; }
+* { box-sizing: border-box; }
+html, body { height: 100%; margin: 0; }
+body { background: radial-gradient(ellipse at 50% 35%, #2a0a0e, var(--bg) 70%); color: var(--fg); font-family: "Chakra Petch", system-ui, sans-serif;
+  display: flex; flex-direction: column; align-items: center; justify-content: space-between; text-align: center; gap: 18px;
+  padding: max(24px, env(safe-area-inset-top)) max(16px, env(safe-area-inset-right)) max(24px, env(safe-area-inset-bottom)) max(16px, env(safe-area-inset-left)); }
+h1 { margin: 0; font-weight: 600; font-size: 26px; letter-spacing: .42em; text-shadow: 0 0 14px rgba(255,80,80,.6); }
+.st { font: 13px "Share Tech Mono", monospace; letter-spacing: .22em; color: var(--hud); margin-top: 10px; }
+.core { position: relative; width: min(66vw, 300px); aspect-ratio: 1; border: none; background: none; padding: 0; cursor: pointer; flex: none; }
+.core i { position: absolute; inset: 0; border-radius: 50%; border: 2px solid rgba(255,80,80,.5); }
+.core i:nth-child(2) { inset: 10%; border-style: dashed; animation: spin 18s linear infinite; }
+.core i:nth-child(3) { inset: 24%; border-width: 6px; border-color: rgba(255,80,80,.8); box-shadow: 0 0 30px rgba(255,80,80,.6), inset 0 0 30px rgba(255,80,80,.5); }
+.core i:nth-child(4) { inset: 38%; background: radial-gradient(circle, #fff2f2, #ff8a8a 55%, rgba(255,80,80,0) 75%); border: none; }
+.core.on i:nth-child(3) { animation: pulse 1.2s ease-in-out infinite; }
+.core.heard i:nth-child(3) { border-color: var(--amber); box-shadow: 0 0 40px rgba(244,246,250,.8), inset 0 0 30px rgba(244,246,250,.5); }
+@keyframes spin { to { transform: rotate(360deg); } }
+@keyframes pulse { 50% { transform: scale(1.06); } }
+.say { min-height: 3.4em; font-size: 20px; line-height: 1.4; max-width: 520px; }
+.say small { display: block; font: 12px "Share Tech Mono", monospace; letter-spacing: .2em; color: var(--muted); margin-bottom: 4px; }
+.row { display: flex; gap: 10px; width: min(100%, 520px); }
+input { flex: 1; min-width: 0; font: 500 17px "Chakra Petch", sans-serif; padding: 14px 16px; border-radius: 12px; border: 1px solid rgba(255,80,80,.35); background: rgba(28,8,12,.7); color: var(--fg); }
+button.b { font: 600 16px "Chakra Petch", sans-serif; padding: 14px 16px; border-radius: 12px; border: 0; background: var(--hud); color: #fff; cursor: pointer; white-space: nowrap; }
+button.g { background: rgba(255,255,255,.08); color: var(--fg); border: 1px solid rgba(255,80,80,.3); }
+.hint { font-size: 13px; color: var(--muted); max-width: 520px; line-height: 1.5; }
+.pair { width: min(100%, 520px); display: grid; gap: 10px; }
+.pair p { margin: 0; font-size: 16px; line-height: 1.45; color: #f3dede; }
+.warn { color: var(--amber); }
+[hidden] { display: none !important; }
+@media (prefers-reduced-motion: reduce) { .core i { animation: none !important; } }
+</style>
+</head>
+<body>
+  <div>
+    <h1>E.D.I.T.H.</h1>
+    <div class="st" id="st">HAZIR</div>
+  </div>
+  <button class="core" id="core" type="button" aria-label="Dinlemeyi başlat ya da durdur"><i></i><i></i><i></i><i></i></button>
+  <div class="say" id="say"><small>DOKUN VE BAŞLAT</small>Çekirdeğe dokun, "Edith" de ve komutunu söyle.</div>
+
+  <div class="pair" id="pair" hidden>
+    <p>Bu telefonu TV'ye bağla: TV'de <b>Benim köşem → Sesli komut</b> ekranındaki <b>qn90b-</b> ile başlayan kodu yaz.</p>
+    <div class="row"><input id="code" type="text" placeholder="qn90b-..." autocomplete="off" autocapitalize="off" spellcheck="false"><button class="b" id="saveCode" type="button">Bağla</button></div>
+  </div>
+  <div class="row" id="cmdRow">
+    <input id="txt" type="text" placeholder="ya da yaz: şömineyi aç" autocomplete="off">
+    <button class="b" id="send" type="button">Gönder</button>
+  </div>
+  <div class="hint">
+    <span id="hint">"Edith, şömineyi aç" · "Edith, ışıkları kıs" · "Edith, tehdit taraması". Açılır açılmaz söylediğin ilk cümle "Edith" demeden de gider.</span><br>
+    <button class="b g" id="unpair" type="button" style="margin-top:10px;font-size:13px;padding:8px 12px">Eşleştirmeyi değiştir</button>
+  </div>
+<script>
+(function () {
+  var $ = function (id) { return document.getElementById(id); };
+  var st = $("st"), say = $("say"), core = $("core");
+  function show(label, text) { say.innerHTML = "<small>" + label + "</small>" + String(text).replace(/[<&]/g, function (c) { return c === "<" ? "&lt;" : "&amp;"; }); }
+
+  // ---------- Eşleştirme: kod adresin #'inden ya da telefonda kayıtlıdan gelir ----------
+  var VALID = /^qn90b-[a-z0-9]{6,}$/;
+  var topic = (location.hash || "").replace(/^#/, "").trim();
+  try { if (VALID.test(topic)) localStorage.setItem("edith.topic", topic); else topic = localStorage.getItem("edith.topic") || ""; } catch (e) {}
+  function paired() { return VALID.test(topic); }
+  function refreshPair() {
+    $("pair").hidden = paired(); $("cmdRow").hidden = !paired(); core.disabled = !paired();
+    if (!paired()) { st.textContent = "EŞLEŞTİRME GEREKLİ"; show("İLK KURULUM", "Önce TV'deki kodu gir."); }
+  }
+  $("saveCode").onclick = function () {
+    var c = $("code").value.trim().toLowerCase();
+    if (!VALID.test(c)) { show("KOD HATALI", "Kod qn90b- ile başlamalı. TV'deki Sesli komut ekranına bak."); return; }
+    topic = c; try { localStorage.setItem("edith.topic", c); } catch (e) {}
+    refreshPair(); shareSite(); send("Edith"); show("BAĞLANDI", "TV'ye selam gönderildi. Çekirdeğe dokunup konuşabilirsin.");
+  };
+  $("unpair").onclick = function () { topic = ""; try { localStorage.removeItem("edith.topic"); } catch (e) {} stop(); refreshPair(); };
+
+  function send(text) {
+    text = (text || "").trim(); if (!text || !paired()) return;
+    show("TV'YE GÖNDERİLDİ", "“" + text + "”");
+    fetch("https://ntfy.sh/" + topic, { method: "POST", body: text })
+      .catch(function () { show("GÖNDERİLEMEDİ", "İnternet bağlantısını kontrol et."); });
+  }
+  // TV, YouTube videolarını bu sitedeki yt.html üzerinden oynatır; adresi TV'ye bildir (yalnız github.io kabul edilir).
+  function shareSite() {
+    if (!paired() || !/\.github\.io$/.test(location.hostname)) return;
+    var base = location.href.split("#")[0].split("?")[0].replace(/[^/]*$/, "");
+    fetch("https://ntfy.sh/" + topic, { method: "POST", body: "__site " + base }).catch(function () {});
+  }
+  shareSite();
+  $("send").onclick = function () { send($("txt").value); $("txt").value = ""; };
+  $("txt").onkeydown = function (e) { if (e.key === "Enter") { send(this.value); this.value = ""; } };
+
+  // ---------- Dinleme ----------
+  var R = window.SpeechRecognition || window.webkitSpeechRecognition;
+  var WAKE = /\b(hey |hay |ey )?(edith|edit|edis|edid|idit|eydit|friday|fraydi|frayday|jarvis|carvis)('?[ae]|'?y[ae]|'?[iı])?\b[\s,.!]*/i;
+  var rec = null, running = false, armedUntil = 0, lock = null;
+  function arm(ms, msg) { armedUntil = Date.now() + ms; core.classList.add("heard"); if (msg) show("DİNLİYORUM", msg); }
+  function disarm() { armedUntil = 0; core.classList.remove("heard"); }
+  function handle(text) {
+    var t = text.toLocaleLowerCase("tr-TR"), m = t.match(WAKE);
+    if (m) {
+      var rest = t.slice(m.index + m[0].length).trim();
+      if (rest.length > 2) { send(rest); disarm(); }
+      else { arm(8000, "Evet patron?"); send("Edith"); }
+    } else if (Date.now() < armedUntil) { send(text); disarm(); }
+  }
+  function start() {
+    if (!R || !paired()) return;
+    rec = new R(); rec.lang = "tr-TR"; rec.continuous = true; rec.interimResults = false;
+    rec.onresult = function (e) { for (var i = e.resultIndex; i < e.results.length; i++) if (e.results[i].isFinal) handle(e.results[i][0].transcript); };
+    rec.onerror = function (e) {
+      if (e.error === "not-allowed" || e.error === "service-not-allowed") { running = false; show("DOKUN", "Dinlemeyi başlatmak için çekirdeğe dokun. İlk seferde mikrofon izni iste."); }
+    };
+    rec.onend = function () {
+      if (running) { setTimeout(function () { try { rec.start(); } catch (er) {} }, 250); }
+      else { core.classList.remove("on"); st.textContent = "DURDU · DOKUN"; }
+    };
+    try {
+      rec.start(); running = true; core.classList.add("on");
+      st.textContent = "DİNLİYOR · \"EDITH\" BEKLENİYOR";
+      arm(10000, "Komutunu söyle patron.");
+      try { if (navigator.wakeLock) navigator.wakeLock.request("screen").then(function (l) { lock = l; }); } catch (e) {}
+    } catch (e) { show("DOKUN", "Dinlemeyi başlatmak için çekirdeğe dokun."); }
+  }
+  function stop() { running = false; disarm(); try { if (rec) rec.stop(); } catch (e) {} try { if (lock) lock.release(); } catch (e) {} }
+  core.onclick = function () { if (running) stop(); else start(); };
+  document.addEventListener("visibilitychange", function () { if (!document.hidden && paired() && !running) start(); });
+
+  if (!R) {
+    show("SES DESTEĞİ YOK", "Bu tarayıcı sesli tanıma desteklemiyor. Android'de Chrome, iPhone'da Safari kullan; ya da aşağıya yaz.");
+    core.disabled = true;
+  }
+  refreshPair();
+  // Uygulama "Ok Google, EDITH aç" ile açıldıysa hemen dinlemeye başla (izin önceden verildiyse çalışır).
+  if (R && paired()) start();
+  if ("serviceWorker" in navigator) navigator.serviceWorker.register("sw.js").catch(function () {});
+})();
+</script>
+</body>
+</html>
