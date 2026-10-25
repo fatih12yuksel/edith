@@ -62,7 +62,7 @@ button.g { background: rgba(255,255,255,.08); color: var(--fg); border: 1px soli
     <button class="b" id="send" type="button">Gönder</button>
   </div>
   <div class="hint">
-    <span id="hint">"Edith, şömineyi aç" · "Edith, ışıkları kıs" · "Edith, tehdit taraması". Açılır açılmaz söylediğin ilk cümle "Edith" demeden de gider.</span><br>
+    <span id="hint">TV'nin cevaplarını bu telefon sesli okur, sayfa açık kalsın. "Edith, şömineyi aç" · "Edith, ışıkları kıs" · "Edith, tehdit taraması". Açılır açılmaz söylediğin ilk cümle "Edith" demeden de gider.</span><br>
     <button class="b g" id="unpair" type="button" style="margin-top:10px;font-size:13px;padding:8px 12px">Eşleştirmeyi değiştir</button>
   </div>
 <script>
@@ -84,9 +84,9 @@ button.g { background: rgba(255,255,255,.08); color: var(--fg); border: 1px soli
     var c = $("code").value.trim().toLowerCase();
     if (!VALID.test(c)) { show("KOD HATALI", "Kod qn90b- ile başlamalı. TV'deki Sesli komut ekranına bak."); return; }
     topic = c; try { localStorage.setItem("edith.topic", c); } catch (e) {}
-    refreshPair(); shareSite(); send("Edith"); show("BAĞLANDI", "TV'ye selam gönderildi. Çekirdeğe dokunup konuşabilirsin.");
+    refreshPair(); shareSite(); listenTv(); send("Edith"); show("BAĞLANDI", "TV'ye selam gönderildi. Çekirdeğe dokunup konuşabilirsin.");
   };
-  $("unpair").onclick = function () { topic = ""; try { localStorage.removeItem("edith.topic"); } catch (e) {} stop(); refreshPair(); };
+  $("unpair").onclick = function () { try { if (es) es.close(); } catch (e) {} topic = ""; try { localStorage.removeItem("edith.topic"); } catch (e) {} stop(); refreshPair(); };
 
   function send(text) {
     text = (text || "").trim(); if (!text || !paired()) return;
@@ -111,6 +111,7 @@ button.g { background: rgba(255,255,255,.08); color: var(--fg); border: 1px soli
   function arm(ms, msg) { armedUntil = Date.now() + ms; core.classList.add("heard"); if (msg) show("DİNLİYORUM", msg); }
   function disarm() { armedUntil = 0; core.classList.remove("heard"); }
   function handle(text) {
+    if (speaking || Date.now() < quietUntil) return;  // telefonun kendi okuduğu cevabı komut sanma
     var t = text.toLocaleLowerCase("tr-TR"), m = t.match(WAKE);
     if (m) {
       var rest = t.slice(m.index + m[0].length).trim();
@@ -126,6 +127,7 @@ button.g { background: rgba(255,255,255,.08); color: var(--fg); border: 1px soli
       if (e.error === "not-allowed" || e.error === "service-not-allowed") { running = false; show("DOKUN", "Dinlemeyi başlatmak için çekirdeğe dokun. İlk seferde mikrofon izni iste."); }
     };
     rec.onend = function () {
+      if (running && speaking) return;  // cevap okunurken mikrofon kapalı; okuma bitince yeniden açılır
       if (running) { setTimeout(function () { try { rec.start(); } catch (er) {} }, 250); }
       else { core.classList.remove("on"); st.textContent = "DURDU · DOKUN"; }
     };
@@ -136,6 +138,50 @@ button.g { background: rgba(255,255,255,.08); color: var(--fg); border: 1px soli
       try { if (navigator.wakeLock) navigator.wakeLock.request("screen").then(function (l) { lock = l; }); } catch (e) {}
     } catch (e) { show("DOKUN", "Dinlemeyi başlatmak için çekirdeğe dokun."); }
   }
+  // ---------- TV'nin cevaplarını sesli oku ----------
+  // TV'nin tarayıcısında konuşma sentezi yok; TV cevabı "__say ..." diye aynı kanala yazar, bu sayfa telefonun Türkçe sesiyle okur.
+  var speaking = false, quietUntil = 0, es = null, seenSay = {}, voice = null;
+  var TTS = window.speechSynthesis && window.SpeechSynthesisUtterance;
+  function pickVoice() {
+    try { var v = speechSynthesis.getVoices(); voice = v.filter(function (x) { return /^tr/i.test(x.lang); })[0] || null; } catch (e) {}
+  }
+  if (TTS) { pickVoice(); speechSynthesis.onvoiceschanged = pickVoice; }
+  function speakOut(text) {
+    show("E.D.I.T.H.", text);
+    if (!TTS) return;
+    try {
+      var u = new SpeechSynthesisUtterance(text); u.lang = "tr-TR"; u.rate = 1.04; u.pitch = 1.1; if (voice) u.voice = voice;
+      speaking = true; try { if (rec) rec.abort(); } catch (e) {}
+      var end = function () {
+        if (!speaking) return; speaking = false; quietUntil = Date.now() + 700;
+        if (running) setTimeout(function () { try { rec.start(); } catch (er) {} }, 300);
+      };
+      u.onend = end; u.onerror = end;
+      setTimeout(end, 1500 + text.length * 90);  // bazı telefonlar "bitti" haberini vermez
+      speechSynthesis.cancel(); speechSynthesis.speak(u);
+    } catch (e) { speaking = false; }
+  }
+  // Chrome, ilk konuşmadan önce bir dokunuş ister: ilk dokunuşta sessiz bir cümleyle sesi aç.
+  var unlocked = false;
+  document.addEventListener("pointerdown", function () {
+    if (unlocked || !TTS) return; unlocked = true;
+    try { var u = new SpeechSynthesisUtterance(" "); u.volume = 0; speechSynthesis.speak(u); } catch (e) {}
+  }, true);
+  function listenTv() {
+    try { if (es) es.close(); } catch (e) {}
+    if (!paired() || !window.EventSource) return;
+    es = new EventSource("https://ntfy.sh/" + topic + "/sse");
+    es.onmessage = function (e) {
+      try {
+        var d = JSON.parse(e.data);
+        if (d.event !== "message" || !d.message || seenSay[d.id]) return;
+        seenSay[d.id] = 1;
+        var m = d.message.match(/^__say ([\s\S]+)$/);
+        if (m) speakOut(m[1]);
+      } catch (er) {}
+    };
+  }
+
   function stop() { running = false; disarm(); try { if (rec) rec.stop(); } catch (e) {} try { if (lock) lock.release(); } catch (e) {} }
   core.onclick = function () { if (running) stop(); else start(); };
   document.addEventListener("visibilitychange", function () { if (!document.hidden && paired() && !running) start(); });
@@ -145,6 +191,7 @@ button.g { background: rgba(255,255,255,.08); color: var(--fg); border: 1px soli
     core.disabled = true;
   }
   refreshPair();
+  listenTv();
   // Uygulama "Ok Google, EDITH aç" ile açıldıysa hemen dinlemeye başla (izin önceden verildiyse çalışır).
   if (R && paired()) start();
   if ("serviceWorker" in navigator) navigator.serviceWorker.register("sw.js").catch(function () {});

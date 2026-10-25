@@ -1,5 +1,5 @@
 // Uygulama olarak yüklenebilmesi için en sade servis çalışanı: sayfayı önbelleğe alır, gerisini ağa bırakır.
-var CACHE = "edith-v1";
+var CACHE = "edith-v2";
 self.addEventListener("install", function (e) {
   e.waitUntil(caches.open(CACHE).then(function (c) { return c.addAll(["./", "index.html", "manifest.webmanifest", "edith-icon.png"]); }));
   self.skipWaiting();
